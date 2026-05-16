@@ -41,24 +41,37 @@ export interface TeamMember {
 
 // Browser client — uses anon key, for frontend components
 // Lazy singleton to avoid build-time errors when env vars are empty
-let _supabase: ReturnType<typeof createClient> | null = null
-export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
-  get(_target, prop) {
-    if (!_supabase) {
-      _supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-    }
-    const value = (_supabase as unknown as Record<string | symbol, unknown>)[prop]
-    return typeof value === 'function' ? value.bind(_supabase) : value
-  },
-})
+function createBrowserClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://placeholder',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder'
+  )
+}
+
+let _supabase: ReturnType<typeof createBrowserClient> | null = null
+
+function getSupabase(): ReturnType<typeof createBrowserClient> {
+  if (!_supabase) {
+    _supabase = createBrowserClient()
+  }
+  return _supabase
+}
+
+export const supabase: ReturnType<typeof createBrowserClient> = new Proxy(
+  {} as ReturnType<typeof createBrowserClient>,
+  {
+    get(_target, prop: string | symbol) {
+      const client = getSupabase()
+      const value = (client as unknown as Record<string | symbol, unknown>)[prop]
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(client) : value
+    },
+  }
+)
 
 // Server client — uses service role key, for API routes only
 export function createServerClient() {
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://placeholder',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder'
   )
 }
