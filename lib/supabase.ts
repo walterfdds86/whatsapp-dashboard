@@ -40,10 +40,20 @@ export interface TeamMember {
 }
 
 // Browser client — uses anon key, for frontend components
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Lazy singleton to avoid build-time errors when env vars are empty
+let _supabase: ReturnType<typeof createClient> | null = null
+export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+  get(_target, prop) {
+    if (!_supabase) {
+      _supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+    }
+    const value = (_supabase as unknown as Record<string | symbol, unknown>)[prop]
+    return typeof value === 'function' ? value.bind(_supabase) : value
+  },
+})
 
 // Server client — uses service role key, for API routes only
 export function createServerClient() {
